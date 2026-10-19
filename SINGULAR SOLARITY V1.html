@@ -1,0 +1,1968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SINGULAR SOLARITY — Infinite Universe Engine</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --glass-bg: rgba(10, 16, 28, 0.58);
+      --glass-border: rgba(120, 210, 255, 0.22);
+      --glass-highlight: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #5ce1e6;
+      --accent-amber: #ffbe55;
+      --accent-purple: #b57cff;
+      --text-main: #ecf6ff;
+      --text-dim: #8aa4c0;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #03050a;
+      color: var(--text-main);
+      font-family: var(--font-sans);
+    }
+
+    /* Render Viewports */
+    #viewport-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #webgl-container, #canvas-2d {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #canvas-2d {
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+
+    body.mode-2d #canvas-2d {
+      pointer-events: auto;
+      opacity: 1;
+    }
+
+    body.mode-2d #webgl-container {
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    /* Glassmorphic UI Base */
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px) saturate(140%);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 var(--glass-highlight);
+      border-radius: 14px;
+      color: var(--text-main);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Top Header Bar */
+    #top-hud {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      right: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 20;
+      gap: 12px;
+    }
+
+    #top-hud > * {
+      pointer-events: auto;
+    }
+
+    .brand-pill {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 18px;
+    }
+
+    .brand-orb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #fff 10%, var(--accent-cyan) 60%, transparent 100%);
+      box-shadow: 0 0 12px var(--accent-cyan);
+      animation: pulseOrb 3s infinite ease-in-out;
+    }
+
+    @keyframes pulseOrb {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+
+    .brand-title {
+      font-weight: 600;
+      letter-spacing: 2.5px;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+    }
+
+    .scale-telemetry {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 10px 22px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .telemetry-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .telemetry-label {
+      color: var(--text-dim);
+      font-size: 0.64rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .telemetry-value {
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sci-btn {
+      background: rgba(16, 28, 48, 0.65);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      color: var(--text-main);
+      padding: 10px 15px;
+      border-radius: 10px;
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .sci-btn:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(92, 225, 230, 0.14);
+      box-shadow: 0 0 16px rgba(92, 225, 230, 0.25);
+      transform: translateY(-1px);
+    }
+
+    .sci-btn.active {
+      background: rgba(92, 225, 230, 0.22);
+      border-color: var(--accent-cyan);
+      color: #fff;
+    }
+
+    .sci-btn.surprise-btn {
+      border-color: rgba(181, 124, 255, 0.5);
+      background: linear-gradient(135deg, rgba(181, 124, 255, 0.18), rgba(92, 225, 230, 0.18));
+    }
+
+    .sci-btn.surprise-btn:hover {
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 20px rgba(181, 124, 255, 0.4);
+    }
+
+    .sci-btn.land-btn {
+      width: 100%;
+      justify-content: center;
+      margin-top: 10px;
+      background: linear-gradient(135deg, rgba(92, 225, 230, 0.22), rgba(40, 180, 130, 0.25));
+      border-color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    /* Right Scale Ladder */
+    #scale-ladder {
+      position: fixed;
+      right: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      z-index: 20;
+      width: 155px;
+    }
+
+    .ladder-title {
+      font-size: 0.65rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    #zoom-slider {
+      writing-mode: bt-lr;
+      -webkit-appearance: slider-vertical;
+      appearance: slider-vertical;
+      width: 6px;
+      height: 190px;
+      background: rgba(255,255,255,0.15);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .scale-tiers {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      width: 100%;
+    }
+
+    .scale-tier-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-dim);
+      font-size: 0.68rem;
+      text-align: left;
+      padding: 5px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      transition: all 0.15s;
+    }
+
+    .scale-tier-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .scale-tier-btn.current {
+      color: var(--accent-cyan);
+      border-color: rgba(92, 225, 230, 0.35);
+      background: rgba(92, 225, 230, 0.1);
+    }
+
+    /* Left Inspector / Lore & Planetary Data Panel */
+    #inspector-panel {
+      position: fixed;
+      left: 18px;
+      top: 82px;
+      width: 340px;
+      max-height: calc(100vh - 260px);
+      overflow-y: auto;
+      padding: 18px;
+      z-index: 20;
+      transform: translateX(0);
+    }
+
+    #inspector-panel.hidden {
+      transform: translateX(-380px);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+
+    .entity-badge {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      color: var(--accent-amber);
+      letter-spacing: 1.2px;
+    }
+
+    .entity-name {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin: 3px 0 0 0;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+
+    .close-btn:hover {
+      color: #fff;
+    }
+
+    #mini-scene-canvas {
+      width: 100%;
+      height: 110px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .lore-box {
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: #d0e2f5;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 10px 12px;
+      border-radius: 8px;
+      border-left: 2px solid var(--accent-cyan);
+      margin-bottom: 12px;
+    }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+    }
+
+    .data-cell {
+      background: rgba(0, 0, 0, 0.28);
+      padding: 7px 9px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .data-cell span {
+      display: block;
+      color: var(--text-dim);
+      font-size: 0.62rem;
+      margin-bottom: 2px;
+    }
+
+    /* Bottom Left Minimap */
+    #minimap-panel {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      width: 220px;
+      padding: 12px;
+      z-index: 20;
+    }
+
+    .minimap-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.68rem;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    #minimap-canvas {
+      width: 194px;
+      height: 130px;
+      border-radius: 8px;
+      background: rgba(2, 6, 14, 0.75);
+      border: 1px solid rgba(92, 225, 230, 0.2);
+      display: block;
+      cursor: crosshair;
+    }
+
+    /* Bottom Center Surface HUD Banner */
+    #surface-banner {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      gap: 18px;
+    }
+
+    #surface-banner.active {
+      display: flex;
+    }
+
+    /* Settings Modal */
+    #settings-panel {
+      position: fixed;
+      top: 76px;
+      right: 185px;
+      width: 300px;
+      padding: 18px;
+      z-index: 30;
+    }
+
+    #settings-panel.hidden {
+      display: none;
+    }
+
+    .setting-row {
+      margin-bottom: 14px;
+    }
+
+    .setting-row label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.76rem;
+      color: var(--text-main);
+      margin-bottom: 5px;
+    }
+
+    .setting-row input[type="range"], .setting-row select {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      color: #fff;
+      border: 1px solid var(--glass-border);
+      padding: 5px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+    }
+
+    /* Discovery Toast Notification */
+    #toast-container {
+      position: fixed;
+      bottom: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 40;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .discovery-toast {
+      padding: 10px 20px;
+      border-color: var(--accent-amber);
+      background: rgba(20, 16, 8, 0.78);
+      color: #ffe9c2;
+      font-size: 0.8rem;
+      letter-spacing: 0.5px;
+      animation: toastFade 4.2s forwards;
+    }
+
+    @keyframes toastFade {
+      0% { opacity: 0; transform: translateY(15px); }
+      12% { opacity: 1; transform: translateY(0); }
+      85% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-10px); }
+    }
+
+    /* Controls Hint */
+    #controls-hint {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      padding: 8px 14px;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      z-index: 15;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="viewport-container">
+    <div id="webgl-container"></div>
+    <canvas id="canvas-2d"></canvas>
+  </div>
+
+  <!-- TOP GLASS HUD -->
+  <header id="top-hud">
+    <div class="glass-panel brand-pill">
+      <div class="brand-orb"></div>
+      <div>
+        <div class="brand-title">Singular Solarity</div>
+        <div style="font-size: 0.65rem; color: var(--text-dim);">Infinite Scale Procedural Cosmos</div>
+      </div>
+    </div>
+
+    <div class="glass-panel scale-telemetry">
+      <div class="telemetry-item">
+        <span class="telemetry-label">Current Scale</span>
+        <span class="telemetry-value" id="hud-scale-val">10^20.0 m</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">Domain Regime</span>
+        <span class="telemetry-value" id="hud-regime-val">Galactic Sector</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">Frustum Culling</span>
+        <span class="telemetry-value" id="hud-cull-val">32 Vis / 96 Culled</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">Discoveries</span>
+        <span class="telemetry-value" id="hud-disc-val">0 / 12 Rare</span>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <button class="sci-btn surprise-btn" id="btn-surprise" title="Teleport to a rare cosmic or microscopic anomaly">
+        ✦ Surprise Me
+      </button>
+      <button class="sci-btn" id="btn-mode-toggle" title="Switch seamlessly between 3D WebGL and 2D Tactical Canvas">
+        Cube / 3D Mode
+      </button>
+      <button class="sci-btn" id="btn-settings">
+        ⚙ Settings
+      </button>
+    </div>
+  </header>
+
+  <!-- LEFT INSPECTOR & LORE PANEL -->
+  <aside id="inspector-panel" class="glass-panel">
+    <div class="panel-header">
+      <div>
+        <div class="entity-badge" id="insp-type">EXOPLANET CANDIDATE</div>
+        <h2 class="entity-name" id="insp-name">Solaria Prime IV</h2>
+      </div>
+      <button class="close-btn" id="btn-close-insp">✕</button>
+    </div>
+
+    <canvas id="mini-scene-canvas" width="300" height="110"></canvas>
+
+    <div class="lore-box" id="insp-lore">
+      Click any star, planet, city node, or microscopic structure in the viewport to inspect its physical telemetry and uncover local stories.
+    </div>
+
+    <div class="data-grid" id="insp-data-grid"></div>
+
+    <button class="sci-btn land-btn" id="btn-land-planet" style="display:none;">
+      🌍 Land & Explore Surface (Google Earth LOD)
+    </button>
+  </aside>
+
+  <!-- RIGHT SCALE LADDER -->
+  <nav id="scale-ladder" class="glass-panel">
+    <div class="ladder-title">Scale Exponent</div>
+    <div class="scale-tiers" id="scale-tier-list">
+      <button class="scale-tier-btn" data-exp="21"><span>Cosmic Web</span><span>10²¹m</span></button>
+      <button class="scale-tier-btn" data-exp="16"><span>Galactic</span><span>10¹⁶m</span></button>
+      <button class="scale-tier-btn" data-exp="11"><span>Star System</span><span>10¹¹m</span></button>
+      <button class="scale-tier-btn" data-exp="6.5"><span>Planetary LOD</span><span>10⁶m</span></button>
+      <button class="scale-tier-btn" data-exp="2"><span>Metropolis</span><span>10²m</span></button>
+      <button class="scale-tier-btn" data-exp="-5"><span>Micro-Cellular</span><span>10⁻⁵m</span></button>
+      <button class="scale-tier-btn" data-exp="-14"><span>Quantum Foam</span><span>10⁻¹⁴m</span></button>
+    </div>
+  </nav>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-panel" class="glass-panel hidden">
+    <div class="panel-header">
+      <div>
+        <div class="entity-badge">ENGINE PARAMETERS</div>
+        <h3 class="entity-name" style="font-size:0.95rem;">Graphics & Culling Settings</h3>
+      </div>
+      <button class="close-btn" id="btn-close-settings">✕</button>
+    </div>
+
+    <div class="setting-row">
+      <label><span>Graphics Quality</span><span id="lbl-quality">Ultra</span></label>
+      <select id="set-quality">
+        <option value="low">Low (Fastest / Low Poly)</option>
+        <option value="medium">Medium (Balanced)</option>
+        <option value="ultra" selected>Ultra (High Shaders + Glow)</option>
+      </select>
+    </div>
+
+    <div class="setting-row">
+      <label><span>Render Distance (Frustum Far)</span><span id="lbl-dist">100%</span></label>
+      <input type="range" id="set-distance" min="40" max="160" value="100" />
+    </div>
+
+    <div class="setting-row">
+      <label><span>Planet Quadtree LOD Depth</span><span id="lbl-lod">Level 6</span></label>
+      <input type="range" id="set-lod" min="2" max="8" value="6" />
+    </div>
+
+    <div class="setting-row">
+      <label><span>Strict Frustum Culling</span><span id="lbl-cull-mode">ON</span></label>
+      <select id="set-culling">
+        <option value="on" selected>Enabled (Only load in-front)</option>
+        <option value="freeze">Freeze Frustum (Inspect Culling)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- BOTTOM LEFT MINIMAP -->
+  <div id="minimap-panel" class="glass-panel">
+    <div class="minimap-header">
+      <span>Exploration Radar</span>
+      <span id="minimap-coords">0.0, 0.0</span>
+    </div>
+    <canvas id="minimap-canvas" width="194" height="130"></canvas>
+  </div>
+
+  <!-- PLANETARY SURFACE MODE BANNER -->
+  <div id="surface-banner" class="glass-panel">
+    <div>
+      <div class="entity-badge">ORBITAL QUADTREE SURFACE EXPLORER</div>
+      <div id="surface-planet-title" style="font-size:0.88rem; font-weight:600;">Exploring Surface</div>
+    </div>
+    <button class="sci-btn" id="btn-exit-surface">↑ Ascend to Space</button>
+  </div>
+
+  <!-- DISCOVERY TOASTS -->
+  <div id="toast-container"></div>
+
+  <!-- CONTROLS HINT -->
+  <div id="controls-hint" class="glass-panel">
+    Scroll: Infinite Zoom • Drag: Pan / Orbit • Click Object: Inspect Lore & Land
+  </div>
+
+  <script>
+    /*************************************************************************
+     * 1. DETERMINISTIC PRNG & SIMPLEX/FRACTAL NOISE ENGINE
+     *************************************************************************/
+    function mulberry32(a) {
+      return function() {
+        let t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+
+    // Fast deterministic 3D Value/Simplex hybrid noise for planetary terrain & biomes
+    function hash3(x, y, z) {
+      let h = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453123;
+      return h - Math.floor(h);
+    }
+
+    function noise3D(x, y, z) {
+      const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+      const fx = x - ix, fy = y - iy, fz = z - iz;
+      const ux = fx * fx * (3 - 2 * fx);
+      const uy = fy * fy * (3 - 2 * fy);
+      const uz = fz * fz * (3 - 2 * fz);
+
+      const n000 = hash3(ix, iy, iz),     n100 = hash3(ix+1, iy, iz);
+      const n010 = hash3(ix, iy+1, iz),   n110 = hash3(ix+1, iy+1, iz);
+      const n001 = hash3(ix, iy, iz+1),   n101 = hash3(ix+1, iy, iz+1);
+      const n011 = hash3(ix, iy+1, iz+1), n111 = hash3(ix+1, iy+1, iz+1);
+
+      const nx00 = n000 * (1 - ux) + n100 * ux;
+      const nx10 = n010 * (1 - ux) + n110 * ux;
+      const nx01 = n001 * (1 - ux) + n101 * ux;
+      const nx11 = n011 * (1 - ux) + n111 * ux;
+
+      const nxy0 = nx00 * (1 - uy) + nx10 * uy;
+      const nxy1 = nx01 * (1 - uy) + nx11 * uy;
+
+      return nxy0 * (1 - uz) + nxy1 * uz;
+    }
+
+    function fbm3D(x, y, z, octaves = 4) {
+      let value = 0, amp = 0.5, freq = 1.0;
+      for (let i = 0; i < octaves; i++) {
+        value += amp * noise3D(x * freq, y * freq, z * freq);
+        freq *= 2.07;
+        amp *= 0.5;
+      }
+      return value;
+    }
+
+    /*************************************************************************
+     * 2. UNIVERSE STATE & PROCEDURAL CATALOG (ACROSS 7 SCALE REGIMES)
+     *************************************************************************/
+    const SCALE_REGIMES = [
+      { min: 18.5, max: 23.0, name: "Intergalactic Cosmic Web", centerExp: 21.0 },
+      { min: 13.5, max: 18.5, name: "Galactic Spiral Sector", centerExp: 16.0 },
+      { min: 8.5,  max: 13.5, name: "Star System & Exoplanets", centerExp: 11.0 },
+      { min: 4.5,  max: 8.5,  name: "Planetary Orbit & Surface LOD", centerExp: 6.5 },
+      { min: -1.5, max: 4.5,  name: "Planetary Metropolis & Biomes", centerExp: 2.0 },
+      { min: -9.5, max: -1.5, name: "Microscopic Cellular Lattice", centerExp: -5.0 },
+      { min: -17.0, max: -9.5, name: "Quantum Foam & Abstract Dimension", centerExp: -14.0 }
+    ];
+
+    const state = {
+      renderMode: '3D', // '3D' or '2D'
+      scaleExp: 16.0,   // Current logarithmic zoom (10^scaleExp meters)
+      targetScaleExp: 16.0,
+      panX: 0,
+      panY: 0,
+      targetPanX: 0,
+      targetPanY: 0,
+      camRotX: 0.35,
+      camRotY: 0.0,
+      selectedEntity: null,
+      surfaceMode: false,
+      activePlanet: null,
+      discoveries: new Set(),
+      visitedTrail: [{ x: 0, y: 0, exp: 16 }],
+      settings: {
+        quality: 'ultra',
+        renderDistancePct: 100,
+        lodDepth: 6,
+        cullingMode: 'on'
+      },
+      stats: {
+        visibleNodes: 0,
+        culledNodes: 0,
+        activeChunks: 0
+      }
+    };
+
+    // Generate deterministic multi-scale universe entities with physical telemetry & stories
+    const universeEntities = [];
+
+    function buildProceduralUniverse() {
+      const rand = mulberry32(421337);
+
+      const galaxyNames = ["Aethelgard Vortex", "Hyperion Filament", "Vela Supercluster Core", "Ophiuchus Void Bridge", "Cygnus Leviathan", "Chronos Elliptical", "Nyx Singularity Halo", "Solaria Prime Spiral"];
+      const starNames = ["Kepler-442 Solaris", "Tau Ceti Echo", "Vega Hypergiant", "TRAPPIST-Omega", "Sirius Binary Pulse", "Nemesia Red Dwarf", "Aurelia Neutron Beacon", "Kerr-9 Black Hole"];
+      const planetNames = ["Solaria IV (Gaia Class)", "Pyros-9 (Molten Core)", "Cryo-Vespera (Subsurface Ocean)", "Aetheris (Diamond Mantle)", "Thalassa (Archipelago World)", "Xylos (Bioluminescent Jungle)", "Valkyrie (Ringed Titan)", "Obsidian-Zero (Rogue World)"];
+      const cityNames = ["Neo-Alexandria Spire", "Pacificus Hydro-Dome", "Terminator Line Solar Array", "Mariana Deep Geothermal Hub", "Aethel Cloud Citadel", "Silicate Megastructure Alpha"];
+      const microNames = ["Mitochondrial ATP Turbine", "CRISPR Ribosome Complex", "Bioluminescent Luciferin Node", "Crystalline Silicon Nanotube", "Bacteriophage T4 Lander", "Graphene Synaptic Junction"];
+      const quantumNames = ["Calabi-Yau 6D Manifold", "Quantum Entanglement Bridge", "Planck-Scale Wormhole Foam", "Tachyon Phase Condenser", "Chronon String Loop", "Zero-Point Vacuum Fluctuation"];
+
+      // Helper to add entity
+      function addNode(config) {
+        universeEntities.push(config);
+      }
+
+      // 1. Cosmic Web Layer (Exp ~21)
+      for (let i = 0; i < 28; i++) {
+        const angle = i * 0.65;
+        const dist = 12 + rand() * 55;
+        const isRare = i === 3 || i === 14;
+        addNode({
+          id: `cosmic_${i}`,
+          name: galaxyNames[i % galaxyNames.length] + ` #${i+1}`,
+          type: isRare ? "RARE COSMIC ANOMALY" : "GALAXY SUPERCLUSTER",
+          scaleBand: 21.0,
+          x: Math.cos(angle) * dist,
+          y: Math.sin(angle) * dist,
+          z: (rand() - 0.5) * 28,
+          radius: 2.2 + rand() * 2.5,
+          color: isRare ? 0xffbe55 : (i % 2 === 0 ? 0x5ce1e6 : 0xb57cff),
+          isRare,
+          lore: isRare
+            ? "A gravitational lensing ring caused by a primordial dark-matter filament intersecting two colliding spiral galaxies."
+            : "A vast filament of dark matter and thousands of galaxies bound across 120 million light-years.",
+          telemetry: {
+            "Redshift (z)": (0.02 + rand() * 0.4).toFixed(3),
+            "Baryonic Mass": `10^${(14 + rand()*2).toFixed(1)} M☉`,
+            "Dark Matter": `${(82 + rand()*10).toFixed(1)}%`,
+            "Filament Temp": `${(1.2 + rand()*3).toFixed(2)}×10⁶ K`
+          }
+        });
+      }
+
+      // 2. Galactic Sector Layer (Exp ~16)
+      for (let i = 0; i < 42; i++) {
+        const arm = i % 3;
+        const t = (i / 42) * Math.PI * 3.5;
+        const r = 6 + (i / 42) * 58;
+        const angle = t + (arm * Math.PI * 2 / 3) + (rand() - 0.5) * 0.4;
+        const isRare = i === 7 || i === 22;
+        addNode({
+          id: `gal_${i}`,
+          name: starNames[i % starNames.length] + ` Sector-${i}`,
+          type: isRare ? "RARE DYSON SWARM / BLACK HOLE" : "STELLAR NURSERY & SYSTEM",
+          scaleBand: 16.0,
+          x: Math.cos(angle) * r,
+          y: Math.sin(angle) * r,
+          z: (rand() - 0.5) * 10,
+          radius: 1.4 + rand() * 1.8,
+          color: isRare ? 0xff5599 : (i % 3 === 0 ? 0x70e8ff : (i % 3 === 1 ? 0xffbe55 : 0x9b87ff)),
+          isRare,
+          lore: isRare
+            ? "Infrared excess signatures confirm a Type-II Kardashev Dyson Swarm harvesting 68% of this star's bolometric luminosity."
+            : "An active stellar nursery rich in heavy elements, proto-planetary disks, and ionized hydrogen nebulae.",
+          telemetry: {
+            "Spectral Class": isRare ? "Kerr Singularity" : ["O5V", "G2V", "M1V", "B8III", "F5V"][i % 5],
+            "Luminosity": `${(0.1 + rand() * 120).toFixed(2)} L☉`,
+            "Metallicity [Fe/H]": (rand() * 0.6 - 0.2).toFixed(2),
+            "Age": `${(0.8 + rand() * 8.5).toFixed(1)} Gyr`
+          }
+        });
+      }
+
+      // 3. Star System & Data-Driven Exoplanets (Exp ~11)
+      // Central Star at (0,0,0)
+      addNode({
+        id: `star_central`,
+        name: "Solaria-Alpha (G2V Hyper-Sun)",
+        type: "HOST MAIN-SEQUENCE STAR",
+        scaleBand: 11.0,
+        x: 0, y: 0, z: 0,
+        radius: 5.2,
+        color: 0xffcc55,
+        isRare: false,
+        lore: "The gravitational anchor of the Solaria system. Acoustic helioseismology reveals core helium fusion stability for another 4.1 billion years.",
+        telemetry: {
+          "Surface Temp": "5,840 K",
+          "Mass": "1.04 M☉",
+          "Rotation Period": "24.8 Days",
+          "Corona Activity": "Moderate Solar Wind"
+        }
+      });
+
+      const planetTemplates = [
+        { name: "Pyros-I", tempK: 1120, water: 0, atmo: "SO₂ / Silicate Vapor", mass: 0.62, radiusKm: 4820, color: 0xff5a36, hex2: "#ff9d3b", tectonics: 0.95, civ: 0.0, rare: false,
+          lore: "Tidally locked lava world. Extreme tidal flexing from Solaria-Alpha keeps the western hemisphere in a permanent magma ocean." },
+        { name: "Aurelia-II", tempK: 410, water: 12, atmo: "92% CO₂, 6% N₂", mass: 0.95, radiusKm: 6110, color: 0xe6b86e, hex2: "#996633", tectonics: 0.45, civ: 0.2, rare: false,
+          lore: "High-pressure sulfuric cloud decks conceal ancient dry riverbeds and automated atmospheric mining aerostats." },
+        { name: "Solaria Prime (Gaia IV)", tempK: 289, water: 71, atmo: "77% N₂, 21% O₂, 1% Ar", mass: 1.08, radiusKm: 6540, color: 0x2ea8ff, hex2: "#3cd070", tectonics: 0.72, civ: 0.95, rare: true,
+          lore: "A super-habitable terrestrial world with lush emerald continents, deep liquid oceans, and orbital elevator rings." },
+        { name: "Thalassa-V (Oceanic)", tempK: 278, water: 94, atmo: "80% N₂, 18% O₂, 2% H₂O", mass: 1.45, radiusKm: 7420, color: 0x1678c2, hex2: "#5ce1e6", tectonics: 0.55, civ: 0.65, rare: false,
+          lore: "Pelagic water world dotted with volcanic archipelagos and bioluminescent abyssal reefs." },
+        { name: "Xylos-VI (Bio-Jungle)", tempK: 304, water: 58, atmo: "71% N₂, 26% O₂,CH₄", mass: 1.22, radiusKm: 6890, color: 0x32c88a, hex2: "#a8ff55", tectonics: 0.68, civ: 0.80, rare: true,
+          lore: "High oxygen partial pressure supports 400-meter silicon-cellulose mega-flora that glow violet during eclipse cycles." },
+        { name: "Cryo-Vespera VII", tempK: 135, water: 85, atmo: "Thin N₂ / CH₄ Haze", mass: 0.48, radiusKm: 3950, color: 0x8ceeff, hex2: "#d8f8ff", tectonics: 0.60, civ: 0.40, rare: false,
+          lore: "Beneath an 18-kilometer crust of fractured water ice lies a warm hydrothermal ocean teeming with chemosynthetic life." }
+      ];
+
+      planetTemplates.forEach((pt, idx) => {
+        const orbitR = 11 + idx * 8.5;
+        const angle = idx * 1.15 + 0.4;
+        addNode({
+          id: `planet_${idx}`,
+          name: pt.name,
+          type: pt.rare ? "HABITABLE EXOPLANET WONDER" : "PLANETARY BODY (LANDABLE)",
+          scaleBand: 11.0,
+          x: Math.cos(angle) * orbitR,
+          y: Math.sin(angle) * orbitR,
+          z: (idx % 2 === 0 ? 1 : -1) * (1.2 + idx * 0.3),
+          orbitRadius: orbitR,
+          radius: 1.65 + (pt.mass * 0.45),
+          color: pt.color,
+          isPlanet: true,
+          isRare: pt.rare,
+          planetData: pt,
+          lore: pt.lore,
+          telemetry: {
+            "Equilibrium Temp": `${pt.tempK} K (${pt.tempK - 273}°C)`,
+            "Hydrosphere": `${pt.water}% Liquid/Ice`,
+            "Atmosphere": pt.atmo,
+            "Mass / Radius": `${pt.mass} M⊕ / ${pt.radiusKm} km`,
+            "Tectonic Index": `${(pt.tectonics * 10).toFixed(1)} / 10`,
+            "Biosphere / Civ": `${Math.round(pt.civ * 100)}% Activity`
+          }
+        });
+      });
+
+      // 4. Planetary Orbit & Surface Quadtree Nodes (Exp ~6.5)
+      for (let i = 0; i < 18; i++) {
+        const angle = (i / 18) * Math.PI * 2;
+        const r = 8 + (i % 3) * 9;
+        addNode({
+          id: `surf_region_${i}`,
+          name: `Continental Quadtree Sector ${String.fromCharCode(65 + (i % 8))}-${i}`,
+          type: "SURFACE TERRAIN CHUNK",
+          scaleBand: 6.5,
+          x: Math.cos(angle) * r,
+          y: Math.sin(angle) * r,
+          z: (rand() - 0.5) * 4,
+          radius: 1.5,
+          color: i % 2 === 0 ? 0x3cd070 : 0x5ce1e6,
+          isRare: i === 4,
+          lore: "High-resolution LiDAR & SAR elevation synthesis chunk. Zoom further or click Land to inspect surface cities and biomes.",
+          telemetry: {
+            "Chunk LOD": "Quadtree Level 5",
+            "Elevation Span": "-4.2 km to +6.8 km",
+            "Biome Class": i % 2 === 0 ? "Temperate Mega-Delta" : "Volcanic Shield Ridge",
+            "Albedo": (0.22 + rand() * 0.35).toFixed(2)
+          }
+        });
+      }
+
+      // 5. Metropolis & Biome Network (Exp ~2.0)
+      for (let i = 0; i < 24; i++) {
+        const angle = i * 0.78;
+        const r = 5 + rand() * 38;
+        const isRare = i === 2 || i === 11;
+        addNode({
+          id: `city_${i}`,
+          name: cityNames[i % cityNames.length] + ` District-${i+1}`,
+          type: isRare ? "RARE ARCHITECTURAL WONDER" : "SURFACE METROPOLIS NODE",
+          scaleBand: 2.0,
+          x: Math.cos(angle) * r,
+          y: Math.sin(angle) * r,
+          z: (rand() - 0.5) * 4,
+          radius: 1.3 + rand() * 1.1,
+          color: isRare ? 0xffbe55 : 0x5ce1e6,
+          isRare,
+          lore: isRare
+            ? "An orbital tether base anchored in bedrock with diamondoid nanotube cables extending 35,786 km into geostationary orbit."
+            : "Autonomous arcology powered by aneutronic He-3 fusion and integrated vertical aeroponic forests.",
+          telemetry: {
+            "Population": `${(0.4 + rand() * 8.2).toFixed(2)} Million`,
+            "Energy Grid": `${(12 + rand() * 85).toFixed(1)} GW Fusion`,
+            "Canopy Cover": `${Math.round(45 + rand() * 45)}%`,
+            "Transit": "Mag-Lev Vacuum Loops"
+          }
+        });
+      }
+
+      // 6. Microscopic Cellular World (Exp ~-5.0)
+      for (let i = 0; i < 26; i++) {
+        const angle = i * 0.92;
+        const r = 6 + rand() * 36;
+        const isRare = i === 5 || i === 19;
+        addNode({
+          id: `micro_${i}`,
+          name: microNames[i % microNames.length] + ` #${i+1}`,
+          type: isRare ? "RARE BIO-NANO ANOMALY" : "CELLULAR / MOLECULAR STRUCTURE",
+          scaleBand: -5.0,
+          x: Math.cos(angle) * r,
+          y: Math.sin(angle) * r,
+          z: (rand() - 0.5) * 14,
+          radius: 1.4 + rand() * 1.2,
+          color: isRare ? 0x55ffaa : 0xb57cff,
+          isRare,
+          lore: isRare
+            ? "A synthetic xenobiology ribozyme capable of direct photoelectric ATP synthesis at 94% quantum efficiency."
+            : "Self-assembling molecular machinery operating inside an aqueous cytoplasmic lattice amidst Brownian thermal motion.",
+          telemetry: {
+            "Scale": `${(0.5 + rand() * 12).toFixed(1)} Micrometers`,
+            "ATP Turnover": `${Math.round(400 + rand() * 900)} molecules/s`,
+            "Folding Energy": `-${(14 + rand() * 30).toFixed(1)} kcal/mol`,
+            "Chirality": "L-Enantiomer Dominant"
+          }
+        });
+      }
+
+      // 7. Quantum Foam & Abstract Dimension (Exp ~-14.0)
+      for (let i = 0; i < 26; i++) {
+        const angle = i * 0.85;
+        const r = 6 + rand() * 38;
+        const isRare = i === 1 || i === 9 || i === 18;
+        addNode({
+          id: `quantum_${i}`,
+          name: quantumNames[i % quantumNames.length] + ` [${i}]`,
+          type: isRare ? "RARE HIGHER-DIMENSIONAL RIFT" : "QUANTUM TOPOLOGY NODE",
+          scaleBand: -14.0,
+          x: Math.cos(angle) * r,
+          y: Math.sin(angle) * r,
+          z: (rand() - 0.5) * 18,
+          radius: 1.6 + rand() * 1.5,
+          color: isRare ? 0xffbe55 : 0xff66cc,
+          isRare,
+          lore: isRare
+            ? "A localized non-Euclidean Calabi-Yau manifold where 6 compactified spatial dimensions unfold into macroscopic phase space."
+            : "Spacetime loses smooth continuity here; virtual particle-antiparticle pairs continuously borrow energy from the quantum vacuum.",
+          telemetry: {
+            "Wavefunction": "Ψ(x,t) Coherent Superposition",
+            "Topology": "6-Dimensional Calabi-Yau",
+            "Energy Density": `10^${(92 + rand()*12).toFixed(0)} J/m³`,
+            "Bell Inequality": "S = 2.828 (Violated)"
+          }
+        });
+      }
+    }
+
+    buildProceduralUniverse();
+
+    /*************************************************************************
+     * 3. THREE.JS 3D ENGINE + GOOGLE EARTH SURFACE LOD + FRUSTUM CULLING
+     *************************************************************************/
+    const webglContainer = document.getElementById('webgl-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x03050a, 0.0045);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 400);
+    camera.position.set(0, -35, 38);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    webglContainer.appendChild(renderer.domElement);
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x88aaff, 0.65);
+    scene.add(ambientLight);
+
+    const sunLight = new THREE.PointLight(0xfff4dd, 2.2, 500);
+    sunLight.position.set(25, 20, 35);
+    scene.add(sunLight);
+
+    // Background Starfield / Quantum Dust
+    const bgStarsGeo = new THREE.BufferGeometry();
+    const starCount = 2400;
+    const starPos = new Float32Array(starCount * 3);
+    const starCols = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount; i++) {
+      starPos[i*3]   = (Math.random() - 0.5) * 360;
+      starPos[i*3+1] = (Math.random() - 0.5) * 360;
+      starPos[i*3+2] = (Math.random() - 0.5) * 220 - 40;
+      const c = new THREE.Color().setHSL(0.55 + Math.random() * 0.25, 0.8, 0.65 + Math.random() * 0.35);
+      starCols[i*3] = c.r; starCols[i*3+1] = c.g; starCols[i*3+2] = c.b;
+    }
+    bgStarsGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    bgStarsGeo.setAttribute('color', new THREE.BufferAttribute(starCols, 3));
+    const bgStarsMat = new THREE.PointsMaterial({ size: 0.7, vertexColors: true, transparent: true, opacity: 0.75 });
+    const bgStars = new THREE.Points(bgStarsGeo, bgStarsMat);
+    scene.add(bgStars);
+
+    // Build 3D Meshes for Universe Entities
+    const universeGroup = new THREE.Group();
+    scene.add(universeGroup);
+
+    const entityMeshes = new Map();
+    const sharedSphereGeo = new THREE.SphereGeometry(1, 28, 28);
+    const sharedTorusGeo = new THREE.TorusKnotGeometry(0.85, 0.24, 64, 12);
+    const sharedRingGeo = new THREE.RingGeometry(1.35, 1.85, 48);
+
+    // Generate Procedural Planet Texture from Physical Telemetry
+    function createDataDrivenPlanetTexture(planetData) {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 128;
+      const ctx = c.getContext('2d');
+      const img = ctx.createImageData(c.width, c.height);
+
+      const waterLevel = planetData.water / 100;
+      const tempK = planetData.tempK;
+      const seedOffset = planetData.mass * 37.3;
+
+      for (let y = 0; y < c.height; y++) {
+        const lat = (y / c.height) * Math.PI - Math.PI / 2;
+        const polarFactor = Math.abs(Math.sin(lat));
+
+        for (let x = 0; x < c.width; x++) {
+          const lon = (x / c.width) * Math.PI * 2;
+          const nx = Math.cos(lat) * Math.cos(lon);
+          const ny = Math.cos(lat) * Math.sin(lon);
+          const nz = Math.sin(lat);
+
+          const elev = fbm3D(nx * 2.6 + seedOffset, ny * 2.6, nz * 2.6, 4);
+          let r = 0, g = 0, b = 0;
+
+          if (tempK > 700) {
+            // Molten Lava World
+            if (elev < 0.48) {
+              r = 255; g = Math.floor(80 + elev * 220); b = 20;
+            } else {
+              r = 55; g = 42; b = 45;
+            }
+          } else if (tempK < 180) {
+            // Cryo Ice World
+            const crack = Math.abs(elev - 0.5) < 0.025;
+            r = crack ? 70 : 195;
+            g = crack ? 175 : 235;
+            b = 255;
+          } else {
+            // Habitable / Terrestrial / Oceanic
+            if (polarFactor > 0.78 && tempK < 320) {
+              // Polar Ice Cap
+              r = 235; g = 245; b = 255;
+            } else if (elev < waterLevel * 0.72) {
+              // Deep & Shallow Ocean
+              const depth = elev / Math.max(0.01, waterLevel * 0.72);
+              r = Math.floor(12 + depth * 35);
+              g = Math.floor(55 + depth * 115);
+              b = Math.floor(135 + depth * 105);
+            } else if (elev < waterLevel * 0.72 + 0.18) {
+              // Vegetation / Biome
+              r = Math.floor(40 + (tempK - 260) * 0.7);
+              g = Math.floor(145 + elev * 60);
+              b = Math.floor(65);
+            } else {
+              // Highland Mountains
+              r = Math.floor(120 + elev * 80);
+              g = Math.floor(110 + elev * 75);
+              b = Math.floor(105 + elev * 70);
+            }
+          }
+
+          const idx = (y * c.width + x) * 4;
+          img.data[idx] = Math.min(255, Math.max(0, r));
+          img.data[idx+1] = Math.min(255, Math.max(0, g));
+          img.data[idx+2] = Math.min(255, Math.max(0, b));
+          img.data[idx+3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      const tex = new THREE.CanvasTexture(c);
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    universeEntities.forEach(ent => {
+      let mesh;
+      if (ent.isPlanet && ent.planetData) {
+        const tex = createDataDrivenPlanetTexture(ent.planetData);
+        const mat = new THREE.MeshStandardMaterial({
+          map: tex,
+          roughness: 0.65,
+          metalness: 0.1
+        });
+        mesh = new THREE.Mesh(sharedSphereGeo, mat);
+
+        // Atmosphere Rayleigh Glow Halo
+        const atmoGeo = new THREE.SphereGeometry(1.14, 24, 24);
+        const atmoMat = new THREE.MeshBasicMaterial({
+          color: ent.color,
+          transparent: true,
+          opacity: 0.24,
+          side: THREE.BackSide
+        });
+        const atmoMesh = new THREE.Mesh(atmoGeo, atmoMat);
+        mesh.add(atmoMesh);
+      } else if (ent.scaleBand <= -10) {
+        // Abstract Quantum Geometry
+        const mat = new THREE.MeshStandardMaterial({
+          color: ent.color,
+          emissive: ent.color,
+          emissiveIntensity: 0.45,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.85
+        });
+        mesh = new THREE.Mesh(sharedTorusGeo, mat);
+      } else {
+        const mat = new THREE.MeshStandardMaterial({
+          color: ent.color,
+          emissive: ent.color,
+          emissiveIntensity: ent.isRare ? 0.7 : 0.35,
+          roughness: 0.35
+        });
+        mesh = new THREE.Mesh(sharedSphereGeo, mat);
+      }
+
+      if (ent.isRare) {
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0xffbe55,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.55
+        });
+        const ring = new THREE.Mesh(sharedRingGeo, ringMat);
+        mesh.add(ring);
+      }
+
+      mesh.userData = { entity: ent, boundingSphere: new THREE.Sphere() };
+      universeGroup.add(mesh);
+      entityMeshes.set(ent.id, mesh);
+    });
+
+    /*************************************************************************
+     * 4. GOOGLE EARTH-STYLE PLANETARY SURFACE QUADTREE EXPLORER (3D & 2D)
+     *************************************************************************/
+    const surfaceGroup = new THREE.Group();
+    surfaceGroup.visible = false;
+    scene.add(surfaceGroup);
+
+    let surfaceChunks = [];
+    let surfacePOIs = [];
+
+    function buildPlanetSurfaceQuadtree(planetEntity) {
+      // Clear previous chunks
+      while (surfaceGroup.children.length > 0) {
+        const obj = surfaceGroup.children[0];
+        if (obj.geometry) obj.geometry.dispose();
+        surfaceGroup.remove(obj);
+      }
+      surfaceChunks = [];
+      surfacePOIs = [];
+
+      const pData = planetEntity.planetData || {
+        name: planetEntity.name,
+        tempK: 290,
+        water: 65,
+        tectonics: 0.7,
+        civ: 0.8,
+        mass: 1.0
+      };
+
+      const gridRes = state.settings.lodDepth * 4; // Dynamic Quadtree resolution from Settings
+      const tileGridCount = 4; // 4x4 dynamically culled terrain chunks
+      const chunkSize = 18;
+      const waterLevel = (pData.water / 100) * 0.65;
+      const seed = pData.mass * 91.7;
+
+      for (let gx = -tileGridCount; gx <= tileGridCount; gx++) {
+        for (let gy = -tileGridCount; gy <= tileGridCount; gy++) {
+          const geo = new THREE.PlaneGeometry(chunkSize, chunkSize, gridRes, gridRes);
+          const posAttr = geo.attributes.position;
+          const colors = new Float32Array(posAttr.count * 3);
+
+          const chunkOffsetX = gx * chunkSize;
+          const chunkOffsetY = gy * chunkSize;
+
+          for (let i = 0; i < posAttr.count; i++) {
+            const vx = posAttr.getX(i) + chunkOffsetX;
+            const vy = posAttr.getY(i) + chunkOffsetY;
+
+            // Curvature + Multi-fractal terrain elevation driven by planet telemetry
+            const distFromCenter = Math.sqrt(vx * vx + vy * vy);
+            const planetaryCurvature = -0.0025 * distFromCenter * distFromCenter;
+
+            const n = fbm3D(vx * 0.06 + seed, vy * 0.06 + seed, seed * 0.2, 5);
+            const elevation = Math.max(waterLevel, n) * (6.5 * pData.tectonics);
+            const finalZ = elevation + planetaryCurvature;
+
+            posAttr.setZ(i, finalZ);
+
+            // Color vertex according to planetary telemetry
+            let r = 0.2, g = 0.5, b = 0.8;
+            if (pData.tempK > 700) {
+              // Volcanic magma planet
+              if (n <= waterLevel + 0.05) { r = 1.0; g = 0.35; b = 0.05; }
+              else { r = 0.18; g = 0.15; b = 0.17; }
+            } else if (pData.tempK < 180) {
+              // Cryo Glacier Planet
+              r = 0.65 + n * 0.3; g = 0.88; b = 1.0;
+            } else {
+              // Terrestrial / Oceanic
+              if (n <= waterLevel + 0.005) {
+                r = 0.06; g = 0.32 + n * 0.4; b = 0.68 + n * 0.3;
+              } else if (n < waterLevel + 0.14) {
+                r = 0.18; g = 0.68; b = 0.38;
+              } else if (n < waterLevel + 0.28) {
+                r = 0.42; g = 0.38; b = 0.32;
+              } else {
+                r = 0.92; g = 0.95; b = 1.0;
+              }
+            }
+            colors[i*3] = r; colors[i*3+1] = g; colors[i*3+2] = b;
+          }
+
+          geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+          geo.computeVertexNormals();
+
+          const mat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.72,
+            metalness: 0.08,
+            wireframe: state.settings.quality === 'low'
+          });
+
+          const chunkMesh = new THREE.Mesh(geo, mat);
+          chunkMesh.position.set(chunkOffsetX, chunkOffsetY, 0);
+          chunkMesh.userData = {
+            isChunk: true,
+            center: new THREE.Vector3(chunkOffsetX, chunkOffsetY, 0),
+            boundingSphere: new THREE.Sphere(new THREE.Vector3(chunkOffsetX, chunkOffsetY, 0), chunkSize * 0.85)
+          };
+          surfaceGroup.add(chunkMesh);
+          surfaceChunks.push(chunkMesh);
+        }
+      }
+
+      // Add Interactive Clickable Surface Cities & Research Outposts
+      const rand = mulberry32(Math.floor(seed * 1000));
+      const poiNames = [
+        "Orbital Tether Anchor Station",
+        "Deep Mantle Geothermal Core",
+        "Hydro-Acoustic Reef Observatory",
+        "Xenobiology Vault & Seed Bank",
+        "Atmospheric Processor Spire",
+        "Ancient Silicate Monolith"
+      ];
+
+      for (let i = 0; i < 10; i++) {
+        const px = (rand() - 0.5) * 85;
+        const py = (rand() - 0.5) * 85;
+        const n = fbm3D(px * 0.06 + seed, py * 0.06 + seed, seed * 0.2, 5);
+        const pz = Math.max(waterLevel, n) * (6.5 * pData.tectonics) + 1.2;
+
+        const poiEnt = {
+          id: `poi_${i}`,
+          name: `${planetEntity.name} — ${poiNames[i % poiNames.length]} #${i+1}`,
+          type: i === 0 ? "RARE PLANETARY WONDER" : "SURFACE POINT OF INTEREST",
+          isRare: i === 0,
+          x: px, y: py, z: pz,
+          color: i === 0 ? 0xffbe55 : 0x5ce1e6,
+          lore: `Surface installation constructed on ${planetEntity.name}. Local telemetry confirms adaptation to ${pData.tempK} K ambient conditions.`,
+          telemetry: {
+            "Coordinates": `${px.toFixed(1)}°N, ${py.toFixed(1)}°E`,
+            "Local Temp": `${pData.tempK} K`,
+            "Elevation": `${(pz * 0.8).toFixed(2)} km`,
+            "Atmosphere": pData.atmo || "Standard"
+          }
+        };
+
+        const beaconGeo = new THREE.CylinderGeometry(0.15, 0.8, 2.4, 16);
+        beaconGeo.rotateX(Math.PI / 2);
+        const beaconMat = new THREE.MeshBasicMaterial({ color: poiEnt.color });
+        const beaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
+        beaconMesh.position.set(px, py, pz);
+        beaconMesh.userData = { entity: poiEnt, boundingSphere: new THREE.Sphere(new THREE.Vector3(px, py, pz), 2.5) };
+        surfaceGroup.add(beaconMesh);
+        surfacePOIs.push(beaconMesh);
+      }
+    }
+
+    /*************************************************************************
+     * 5. FRUSTUM CULLING ("ONLY LOAD WHAT'S IN FRONT") & UPDATE LOOP
+     *************************************************************************/
+    const frustum = new THREE.Frustum();
+    const projScreenMatrix = new THREE.Matrix4();
+
+    function updateUniverseAndCulling(time) {
+      // Smooth interpolation for zoom & pan
+      state.scaleExp += (state.targetScaleExp - state.scaleExp) * 0.12;
+      state.panX += (state.targetPanX - state.panX) * 0.14;
+      state.panY += (state.targetPanY - state.panY) * 0.14;
+
+      // Update Camera Frustum if not frozen
+      camera.far = 140 * (state.settings.renderDistancePct / 100);
+      camera.updateProjectionMatrix();
+
+      if (state.settings.cullingMode !== 'freeze') {
+        camera.updateMatrixWorld();
+        projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        frustum.setFromProjectionMatrix(projScreenMatrix);
+      }
+
+      let visibleCount = 0;
+      let culledCount = 0;
+
+      if (state.surfaceMode) {
+        universeGroup.visible = false;
+        surfaceGroup.visible = true;
+
+        surfaceGroup.position.set(-state.panX, -state.panY, 0);
+
+        // Frustum cull planetary terrain quadtree chunks
+        surfaceChunks.forEach(chunk => {
+          const worldCenter = chunk.userData.center.clone().add(surfaceGroup.position);
+          chunk.userData.boundingSphere.center.copy(worldCenter);
+
+          if (frustum.intersectsSphere(chunk.userData.boundingSphere)) {
+            chunk.visible = true;
+            visibleCount++;
+          } else {
+            chunk.visible = false;
+            culledCount++;
+          }
+        });
+
+        surfacePOIs.forEach(poi => {
+          const ent = poi.userData.entity;
+          const worldPos = new THREE.Vector3(ent.x - state.panX, ent.y - state.panY, ent.z);
+          poi.userData.boundingSphere.center.copy(worldPos);
+          poi.rotation.z = time * 0.002;
+          if (frustum.intersectsSphere(poi.userData.boundingSphere)) {
+            poi.visible = true;
+            visibleCount++;
+          } else {
+            poi.visible = false;
+            culledCount++;
+          }
+        });
+
+      } else {
+        universeGroup.visible = true;
+        surfaceGroup.visible = false;
+
+        universeEntities.forEach(ent => {
+          const mesh = entityMeshes.get(ent.id);
+          if (!mesh) return;
+
+          // Calculate relative scale factor between entity's band and current camera zoom exponent
+          const expDiff = ent.scaleBand - state.scaleExp;
+
+          // Only active if within scale window
+          if (Math.abs(expDiff) > 4.2) {
+            mesh.visible = false;
+            culledCount++;
+            return;
+          }
+
+          const scaleFactor = Math.pow(1.42, expDiff);
+          const worldX = (ent.x - state.panX) * scaleFactor;
+          const worldY = (ent.y - state.panY) * scaleFactor;
+          const worldZ = ent.z * scaleFactor;
+          const worldRadius = Math.max(0.15, ent.radius * scaleFactor);
+
+          mesh.position.set(worldX, worldY, worldZ);
+          mesh.scale.setScalar(worldRadius);
+          mesh.rotation.y = time * 0.0006;
+          mesh.rotation.z = time * 0.0003;
+
+          // Update bounding sphere for mathematical View-Frustum Culling
+          mesh.userData.boundingSphere.center.set(worldX, worldY, worldZ);
+          mesh.userData.boundingSphere.radius = worldRadius * 1.3;
+
+          if (frustum.intersectsSphere(mesh.userData.boundingSphere)) {
+            mesh.visible = true;
+            visibleCount++;
+          } else {
+            mesh.visible = false;
+            culledCount++;
+          }
+        });
+      }
+
+      state.stats.visibleNodes = visibleCount;
+      state.stats.culledNodes = culledCount;
+      updateHUDTelemetry();
+    }
+
+    /*************************************************************************
+     * 6. 2D HTML5 CANVAS TACTICAL HOLOGRAPHIC RENDERER
+     *************************************************************************/
+    const canvas2D = document.getElementById('canvas-2d');
+    const ctx2D = canvas2D.getContext('2d');
+
+    function render2DUniverse(time) {
+      if (state.renderMode !== '2D') return;
+
+      if (canvas2D.width !== window.innerWidth || canvas2D.height !== window.innerHeight) {
+        canvas2D.width = window.innerWidth;
+        canvas2D.height = window.innerHeight;
+      }
+
+      const w = canvas2D.width;
+      const h = canvas2D.height;
+      const cx = w / 2;
+      const cy = h / 2;
+
+      ctx2D.fillStyle = '#03060e';
+      ctx2D.fillRect(0, 0, w, h);
+
+      // Draw Holographic Coordinate Grid
+      ctx2D.strokeStyle = 'rgba(92, 225, 230, 0.07)';
+      ctx2D.lineWidth = 1;
+      const gridStep = 70;
+      const offX = ((-state.panX * 12) % gridStep + gridStep) % gridStep;
+      const offY = ((state.panY * 12) % gridStep + gridStep) % gridStep;
+
+      for (let x = offX; x < w; x += gridStep) {
+        ctx2D.beginPath(); ctx2D.moveTo(x, 0); ctx2D.lineTo(x, h); ctx2D.stroke();
+      }
+      for (let y = offY; y < h; y += gridStep) {
+        ctx2D.beginPath(); ctx2D.moveTo(0, y); ctx2D.lineTo(w, y); ctx2D.stroke();
+      }
+
+      const pxPerUnit = 14;
+
+      if (state.surfaceMode && state.activePlanet) {
+        // 2D Topographic Contour Map of Planet Surface
+        const pData = state.activePlanet.planetData || { mass: 1, tempK: 288, water: 70 };
+        const seed = pData.mass * 91.7;
+        const step = 28;
+
+        for (let sx = 0; sx < w; sx += step) {
+          for (let sy = 0; sy < h; sy += step) {
+            const wx = (sx - cx) / pxPerUnit + state.panX;
+            const wy = (cy - sy) / pxPerUnit + state.panY;
+            const n = fbm3D(wx * 0.06 + seed, wy * 0.06 + seed, seed * 0.2, 3);
+            const isLand = n > (pData.water / 100) * 0.65;
+            ctx2D.fillStyle = isLand
+              ? `rgba(60, 210, 130, ${0.12 + n * 0.28})`
+              : `rgba(30, 120, 210, ${0.12 + n * 0.2})`;
+            ctx2D.fillRect(sx, sy, step - 2, step - 2);
+          }
+        }
+
+        // Draw Surface POIs
+        surfacePOIs.forEach(poi => {
+          const ent = poi.userData.entity;
+          const sx = cx + (ent.x - state.panX) * pxPerUnit;
+          const sy = cy - (ent.y - state.panY) * pxPerUnit;
+          if (sx < -40 || sx > w + 40 || sy < -40 || sy > h + 40) return;
+
+          ctx2D.beginPath();
+          ctx2D.arc(sx, sy, 8, 0, Math.PI * 2);
+          ctx2D.fillStyle = ent.isRare ? '#ffbe55' : '#5ce1e6';
+          ctx2D.fill();
+          ctx2D.fillStyle = '#ecf6ff';
+          ctx2D.font = '11px monospace';
+          ctx2D.fillText(ent.name.split('—')[1] || ent.name, sx + 12, sy + 4);
+        });
+        return;
+      }
+
+      // Draw Universe Entities in 2D with Viewport Culling
+      universeEntities.forEach(ent => {
+        const expDiff = ent.scaleBand - state.scaleExp;
+        if (Math.abs(expDiff) > 4.2) return;
+
+        const scaleFactor = Math.pow(1.42, expDiff);
+        const sx = cx + (ent.x - state.panX) * scaleFactor * pxPerUnit;
+        const sy = cy - (ent.y - state.panY) * scaleFactor * pxPerUnit;
+        const r = Math.max(3, ent.radius * scaleFactor * pxPerUnit * 0.65);
+
+        // 2D Viewport Culling ("only draw what's in front")
+        if (sx + r < 0 || sx - r > w || sy + r < 0 || sy - r > h) return;
+
+        // Draw Orbital Ring if Planet
+        if (ent.orbitRadius) {
+          const ox = cx - state.panX * scaleFactor * pxPerUnit;
+          const oy = cy + state.panY * scaleFactor * pxPerUnit;
+          ctx2D.beginPath();
+          ctx2D.arc(ox, oy, ent.orbitRadius * scaleFactor * pxPerUnit, 0, Math.PI * 2);
+          ctx2D.strokeStyle = 'rgba(120, 210, 255, 0.14)';
+          ctx2D.stroke();
+        }
+
+        const hexColor = '#' + ent.color.toString(16).padStart(6, '0');
+        const grad = ctx2D.createRadialGradient(sx, sy, r * 0.1, sx, sy, r * 1.8);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.4, hexColor);
+        grad.addColorStop(1, 'transparent');
+
+        ctx2D.beginPath();
+        ctx2D.arc(sx, sy, r * 1.8, 0, Math.PI * 2);
+        ctx2D.fillStyle = grad;
+        ctx2D.fill();
+
+        if (ent.isRare) {
+          ctx2D.beginPath();
+          ctx2D.arc(sx, sy, r * 1.5 + Math.sin(time * 0.005) * 3, 0, Math.PI * 2);
+          ctx2D.strokeStyle = '#ffbe55';
+          ctx2D.setLineDash([4, 4]);
+          ctx2D.stroke();
+          ctx2D.setLineDash([]);
+        }
+
+        if (r > 6) {
+          ctx2D.fillStyle = 'rgba(236, 246, 255, 0.88)';
+          ctx2D.font = '11px monospace';
+          ctx2D.fillText(ent.name, sx + r + 6, sy + 4);
+        }
+      });
+    }
+
+    /*************************************************************************
+     * 7. EXPLORATION MINIMAP & MINI-SCENE RENDERER
+     *************************************************************************/
+    const minimapCanvas = document.getElementById('minimap-canvas');
+    const minimapCtx = minimapCanvas.getContext('2d');
+
+    function renderMinimap() {
+      const w = minimapCanvas.width;
+      const h = minimapCanvas.height;
+      minimapCtx.fillStyle = 'rgba(3, 8, 18, 0.92)';
+      minimapCtx.fillRect(0, 0, w, h);
+
+      const cx = w / 2;
+      const cy = h / 2;
+      const mapScale = 1.35;
+
+      // Draw Fog-of-War Explored Breadcrumbs
+      state.visitedTrail.forEach(pt => {
+        if (Math.abs(pt.exp - state.scaleExp) < 3.5) {
+          minimapCtx.beginPath();
+          minimapCtx.arc(cx + pt.x * mapScale, cy - pt.y * mapScale, 14, 0, Math.PI * 2);
+          minimapCtx.fillStyle = 'rgba(92, 225, 230, 0.08)';
+          minimapCtx.fill();
+        }
+      });
+
+      // Draw Active Layer Entities
+      universeEntities.forEach(ent => {
+        if (Math.abs(ent.scaleBand - state.scaleExp) < 2.8) {
+          const mx = cx + ent.x * mapScale;
+          const my = cy - ent.y * mapScale;
+          minimapCtx.fillStyle = ent.isRare ? '#ffbe55' : '#5ce1e6';
+          minimapCtx.fillRect(mx - 1.5, my - 1.5, 3, 3);
+        }
+      });
+
+      // Draw Camera View Frustum Cone ("Only load what's in front" indicator)
+      const camX = cx + state.panX * mapScale;
+      const camY = cy - state.panY * mapScale;
+
+      minimapCtx.beginPath();
+      minimapCtx.moveTo(camX, camY);
+      minimapCtx.lineTo(camX - 18, camY - 26);
+      minimapCtx.lineTo(camX + 18, camY - 26);
+      minimapCtx.closePath();
+      minimapCtx.fillStyle = 'rgba(92, 225, 230, 0.22)';
+      minimapCtx.fill();
+      minimapCtx.strokeStyle = 'rgba(92, 225, 230, 0.65)';
+      minimapCtx.stroke();
+
+      minimapCtx.beginPath();
+      minimapCtx.arc(camX, camY, 3.5, 0, Math.PI * 2);
+      minimapCtx.fillStyle = '#ffffff';
+      minimapCtx.fill();
+
+      document.getElementById('minimap-coords').textContent =
+        `${state.panX.toFixed(1)}, ${state.panY.toFixed(1)}`;
+    }
+
+    // Animated Mini-Scene inside Inspector Panel
+    const miniSceneCanvas = document.getElementById('mini-scene-canvas');
+    const miniCtx = miniSceneCanvas.getContext('2d');
+
+    function renderInspectorMiniScene(time) {
+      const ent = state.selectedEntity;
+      const w = miniSceneCanvas.width;
+      const h = miniSceneCanvas.height;
+      miniCtx.fillStyle = '#040812';
+      miniCtx.fillRect(0, 0, w, h);
+
+      if (!ent) {
+        miniCtx.fillStyle = '#5ce1e6';
+        miniCtx.font = '11px monospace';
+        miniCtx.fillText('AWAITING TARGET SELECTION...', 55, 58);
+        return;
+      }
+
+      const hexColor = '#' + (ent.color || 0x5ce1e6).toString(16).padStart(6, '0');
+
+      // Draw Animated Telemetry Wave & Object Preview
+      for (let i = 0; i < 36; i++) {
+        const x = (i / 35) * w;
+        const y = h * 0.5 + Math.sin(time * 0.004 + i * 0.4) * 22 * Math.cos(i * 0.15);
+        miniCtx.fillStyle = 'rgba(92, 225, 230, 0.25)';
+        miniCtx.fillRect(x, y, 3, 3);
+      }
+
+      // Draw Rotating Core Target
+      miniCtx.save();
+      miniCtx.translate(w * 0.24, h * 0.5);
+      const grad = miniCtx.createRadialGradient(0, 0, 4, 0, 0, 32);
+      grad.addColorStop(0, '#fff');
+      grad.addColorStop(0.45, hexColor);
+      grad.addColorStop(1, 'transparent');
+      miniCtx.fillStyle = grad;
+      miniCtx.beginPath();
+      miniCtx.arc(0, 0, 32, 0, Math.PI * 2);
+      miniCtx.fill();
+
+      miniCtx.strokeStyle = ent.isRare ? '#ffbe55' : '#5ce1e6';
+      miniCtx.beginPath();
+      miniCtx.ellipse(0, 0, 36, 12, time * 0.0015, 0, Math.PI * 2);
+      miniCtx.stroke();
+      miniCtx.restore();
+
+      miniCtx.fillStyle = '#ecf6ff';
+      miniCtx.font = '11px monospace';
+      miniCtx.fillText(`SIGNAL LOCK: ${ent.id.toUpperCase()}`, w * 0.48, 38);
+      miniCtx.fillStyle = '#8aa4c0';
+      miniCtx.fillText(`BAND: 10^${(ent.scaleBand || 6).toFixed(1)} m`, w * 0.48, 58);
+      miniCtx.fillStyle = ent.isRare ? '#ffbe55' : '#5ce1e6';
+      miniCtx.fillText(ent.isRare ? '★ RARE ANOMALY' : '● TELEMETRY NOMINAL', w * 0.48, 78);
+    }
+
+    /*************************************************************************
+     * 8. UI INTERACTIONS, RAYCASTING, LORE INSPECTOR & "SURPRISE ME"
+     *************************************************************************/
+    function selectEntity(ent) {
+      state.selectedEntity = ent;
+      const panel = document.getElementById('inspector-panel');
+      panel.classList.remove('hidden');
+
+      document.getElementById('insp-type').textContent = ent.type;
+      document.getElementById('insp-name').textContent = ent.name;
+      document.getElementById('insp-lore').textContent = ent.lore;
+
+      const grid = document.getElementById('insp-data-grid');
+      grid.innerHTML = '';
+      if (ent.telemetry) {
+        Object.entries(ent.telemetry).forEach(([k, v]) => {
+          const cell = document.createElement('div');
+          cell.className = 'data-cell';
+          cell.innerHTML = `<span>${k}</span><strong>${v}</strong>`;
+          grid.appendChild(cell);
+        });
+      }
+
+      const landBtn = document.getElementById('btn-land-planet');
+      if (ent.isPlanet && !state.surfaceMode) {
+        landBtn.style.display = 'inline-flex';
+      } else {
+        landBtn.style.display = 'none';
+      }
+
+      // Log Rare Discovery
+      if (ent.isRare && !state.discoveries.has(ent.id)) {
+        state.discoveries.add(ent.id);
+        showDiscoveryToast(`✦ RARE DISCOVERY UNLOCKED: ${ent.name}`);
+      }
+    }
+
+    function showDiscoveryToast(msg) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'glass-panel discovery-toast';
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 4200);
+    }
+
+    function updateHUDTelemetry() {
+      document.getElementById('hud-scale-val').textContent = `10^${state.scaleExp.toFixed(1)} m`;
+
+      const regime = SCALE_REGIMES.find(r => state.scaleExp >= r.min && state.scaleExp <= r.max)
+        || SCALE_REGIMES[0];
+      document.getElementById('hud-regime-val').textContent =
+        state.surfaceMode ? `Surface Quadtree (${state.activePlanet.name})` : regime.name;
+
+      document.getElementById('hud-cull-val').textContent =
+        `${state.stats.visibleNodes} Vis / ${state.stats.culledNodes} Culled`;
+
+      document.getElementById('hud-disc-val').textContent =
+        `${state.discoveries.size} / 12 Rare`;
+
+      // Highlight current scale ladder button
+      document.querySelectorAll('.scale-tier-btn').forEach(btn => {
+        const exp = parseFloat(btn.dataset.exp);
+        btn.classList.toggle('current', Math.abs(state.scaleExp - exp) < 2.6);
+      });
+    }
+
+    // Enter / Exit Planetary Surface Quadtree Mode (Google Earth Style)
+    document.getElementById('btn-land-planet').addEventListener('click', () => {
+      if (!state.selectedEntity || !state.selectedEntity.isPlanet) return;
+      state.surfaceMode = true;
+      state.activePlanet = state.selectedEntity;
+      state.targetPanX = 0;
+      state.targetPanY = 0;
+      state.targetScaleExp = 6.5;
+      buildPlanetSurfaceQuadtree(state.activePlanet);
+      document.getElementById('surface-planet-title').textContent =
+        `${state.activePlanet.name} — Surface Quadtree Explorer`;
+      document.getElementById('surface-banner').classList.add('active');
+      document.getElementById('btn-land-planet').style.display = 'none';
+      showDiscoveryToast(`🌍 Entered Orbital Quadtree Surface Mode: ${state.activePlanet.name}`);
+    });
+
+    document.getElementById('btn-exit-surface').addEventListener('click', () => {
+      state.surfaceMode = false;
+      state.targetScaleExp = 11.0;
+      document.getElementById('surface-banner').classList.remove('active');
+      if (state.selectedEntity && state.selectedEntity.isPlanet) {
+        document.getElementById('btn-land-planet').style.display = 'inline-flex';
+      }
+    });
+
+    // "Surprise Me" Quantum Teleport Button
+    document.getElementById('btn-surprise').addEventListener('click', () => {
+      state.surfaceMode = false;
+      document.getElementById('surface-banner').classList.remove('active');
+
+      const candidates = universeEntities.filter(e => e.isRare || e.isPlanet);
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      state.targetScaleExp = pick.scaleBand;
+      state.targetPanX = pick.x;
+      state.targetPanY = pick.y;
+      state.visitedTrail.push({ x: pick.x, y: pick.y, exp: pick.scaleBand });
+      selectEntity(pick);
+      showDiscoveryToast(`⚡ Quantum Jump Complete → ${pick.name}`);
+    });
+
+    // 2D / 3D Mode Switcher
+    const modeBtn = document.getElementById('btn-mode-toggle');
+    modeBtn.addEventListener('click', () => {
+      if (state.renderMode === '3D') {
+        state.renderMode = '2D';
+        document.body.classList.add('mode-2d');
+        modeBtn.textContent = 'Hologram / 2D Mode';
+        modeBtn.classList.add('active');
+      } else {
+        state.renderMode = '3D';
+        document.body.classList.remove('mode-2d');
+        modeBtn.textContent = 'Cube / 3D Mode';
+        modeBtn.classList.remove('active');
+      }
+    });
+
+    // Scale Ladder Buttons
+    document.querySelectorAll('.scale-tier-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.surfaceMode = false;
+        document.getElementById('surface-banner').classList.remove('active');
+        state.targetScaleExp = parseFloat(btn.dataset.exp);
+        state.targetPanX = 0;
+        state.targetPanY = 0;
+      });
+    });
+
+    // Settings Panel Controls
+    const settingsPanel = document.getElementById('settings-panel');
+    document.getElementById('btn-settings').addEventListener('click', () => {
+      settingsPanel.classList.toggle('hidden');
+    });
+    document.getElementById('btn-close-settings').addEventListener('click', () => {
+      settingsPanel.classList.add('hidden');
+    });
+    document.getElementById('btn-close-insp').addEventListener('click', () => {
+      document.getElementById('inspector-panel').classList.add('hidden');
+    });
+
+    document.getElementById('set-quality').addEventListener('change', (e) => {
+      state.settings.quality = e.target.value;
+      document.getElementById('lbl-quality').textContent = e.target.value.toUpperCase();
+      renderer.setPixelRatio(e.target.value === 'low' ? 1 : Math.min(window.devicePixelRatio, 2));
+      if (state.surfaceMode && state.activePlanet) buildPlanetSurfaceQuadtree(state.activePlanet);
+    });
+
+    document.getElementById('set-distance').addEventListener('input', (e) => {
+      state.settings.renderDistancePct = parseInt(e.target.value, 10);
+      document.getElementById('lbl-dist').textContent = `${e.target.value}%`;
+    });
+
+    document.getElementById('set-lod').addEventListener('input', (e) => {
+      state.settings.lodDepth = parseInt(e.target.value, 10);
+      document.getElementById('lbl-lod').textContent = `Level ${e.target.value}`;
+      if (state.surfaceMode && state.activePlanet) buildPlanetSurfaceQuadtree(state.activePlanet);
+    });
+
+    document.getElementById('set-culling').addEventListener('change', (e) => {
+      state.settings.cullingMode = e.target.value;
+      document.getElementById('lbl-cull-mode').textContent = e.target.value === 'on' ? 'ON' : 'FROZEN';
+    });
+
+    /*************************************************************************
+     * 9. POINTER PANNING, INFINITE ZOOM WHEEL & CLICK RAYCASTING
+     *************************************************************************/
+    let isDragging = false;
+    let dragStartX = 0, dragStartY = 0;
+    let pointerDownPos = { x: 0, y: 0 };
+
+    window.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.glass-panel') || e.target.closest('.sci-btn')) return;
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+
+      state.targetPanX -= dx * 0.08;
+      state.targetPanY += dy * 0.08;
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+
+      const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (moveDist < 6) {
+        handleViewportClick(e.clientX, e.clientY);
+      } else {
+        state.visitedTrail.push({ x: state.targetPanX, y: state.targetPanY, exp: state.scaleExp });
+        if (state.visitedTrail.length > 60) state.visitedTrail.shift();
+      }
+    });
+
+    window.addEventListener('wheel', (e) => {
+      if (e.target.closest('.glass-panel')) return;
+      e.preventDefault();
+      if (state.surfaceMode) {
+        camera.position.z = Math.max(12, Math.min(75, camera.position.z + e.deltaY * 0.03));
+      } else {
+        state.targetScaleExp = Math.max(-16.0, Math.min(22.5, state.targetScaleExp + e.deltaY * 0.0035));
+      }
+    }, { passive: false });
+
+    const raycaster = new THREE.Raycaster();
+    const mouseNDC = new THREE.Vector2();
+
+    function handleViewportClick(clientX, clientY) {
+      if (state.renderMode === '3D') {
+        mouseNDC.x = (clientX / window.innerWidth) * 2 - 1;
+        mouseNDC.y = -(clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouseNDC, camera);
+
+        const targetList = state.surfaceMode ? surfacePOIs : Array.from(entityMeshes.values()).filter(m => m.visible);
+        const hits = raycaster.intersectObjects(targetList, false);
+        if (hits.length > 0 && hits[0].object.userData.entity) {
+          const ent = hits[0].object.userData.entity;
+          selectEntity(ent);
+          state.targetPanX = ent.x;
+          state.targetPanY = ent.y;
+        }
+      } else {
+        // 2D Canvas Hit Testing
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2;
+        const pxPerUnit = 14;
+
+        for (const ent of universeEntities) {
+          const expDiff = ent.scaleBand - state.scaleExp;
+          if (Math.abs(expDiff) > 4.2) continue;
+          const scaleFactor = Math.pow(1.42, expDiff);
+          const sx = cx + (ent.x - state.panX) * scaleFactor * pxPerUnit;
+          const sy = cy - (ent.y - state.panY) * scaleFactor * pxPerUnit;
+          const r = Math.max(8, ent.radius * scaleFactor * pxPerUnit);
+          if (Math.hypot(clientX - sx, clientY - sy) <= r * 1.4) {
+            selectEntity(ent);
+            state.targetPanX = ent.x;
+            state.targetPanY = ent.y;
+            break;
+          }
+        }
+      }
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Select a default habitable planet on startup so the user immediately sees rich telemetry
+    const initialPlanet = universeEntities.find(e => e.id === 'planet_2');
+    if (initialPlanet) selectEntity(initialPlanet);
+
+    /*************************************************************************
+     * 10. MAIN ANIMATION LOOP
+     *************************************************************************/
+    function animate(time) {
+      requestAnimationFrame(animate);
+      updateUniverseAndCulling(time);
+
+      if (state.renderMode === '3D') {
+        renderer.render(scene, camera);
+      } else {
+        render2DUniverse(time);
+      }
+
+      renderMinimap();
+      renderInspectorMiniScene(time);
+    }
+
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
